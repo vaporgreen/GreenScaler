@@ -1,0 +1,11 @@
+{
+  "name": "GreenScaler",
+  "author": "vaporgreen",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": ["installer", "optiscaler", "framegen", "fsr4", "proton"],
+    "description": "Instala e mantém atualizado o OptiScaler com ANR FG (Apex Neural Rendering) nos jogos Proton, com FSR 4 por padrão.",
+    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+  }
+}
