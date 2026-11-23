@@ -18,6 +18,14 @@ import time
 import zipfile
 from urllib.parse import unquote
 
+from .profiles import (
+    ProfileDB,
+    classify_proton,
+    fetch_protondb,
+    list_custom_protons,
+    read_proton_mapping,
+)
+
 ANR_REPO = "apex-compute/ANR"
 OPTI_REPO = "optiscaler/OptiScaler-nightly"
 REF_REPO = "praydog/REFramework-nightly"
@@ -47,9 +55,11 @@ DEFAULTS = {
     "fsr4": True,           # Dx12Upscaler=ffx + PROTON_FSR4_UPGRADE=1
     "fsr4_model": "auto",   # auto | 0 FP8 | 1 INT8 | 2 INT8 RDNA2 | 3 INT8 Lite
     "fg": "game",           # off | game (follow the game's menu) | 1..5 generated frames (2X..6X)
+    "proxy": "auto",        # auto (wiki/engine) | dxgi.dll | winmm.dll | version.dll
     "streamline": False,    # fetch NVIDIA-RTX/Streamline bin/x64/*.dll into OptiScaler/streamline/
     "mfg_unlocker": False,  # fetch dashdogy/MFG-Unlocker -> OptiScaler/plugins/MFGUnlocker.asi + LoadAsiPlugins=true
     "reframework": True,    # RE Engine games only
+    "profile_tweaks": True, # apply OptiScaler Wiki / Proton INI & launch overrides when available
 }
 
 
@@ -209,7 +219,7 @@ def ini_get(text, section, key):
     return None
 
 
-def apply_options(text, opts):
+def apply_options(text, opts, extra_ini=None):
     fg = opts.get("fg", "game")
     if opts.get("fsr4"):
         text = ini_set(text, "Upscalers", "Dx12Upscaler", "ffx")
@@ -227,6 +237,11 @@ def apply_options(text, opts):
         text = ini_set(text, "DLSSG", "OverrideInterpolationCount", count)
     if opts.get("mfg_unlocker"):
         text = ini_set(text, "Plugins", "LoadAsiPlugins", "true")
+    if opts.get("profile_tweaks", True) and isinstance(extra_ini, dict):
+        for section, kv in extra_ini.items():
+            if isinstance(kv, dict):
+                for key, val in kv.items():
+                    text = ini_set(text, section, key, val)
     return text
 
 
@@ -261,31 +276,52 @@ def _overrides(pre, drop):
     return pre, kept
 
 
-def _strip_env(pre):
-    for name in _MANAGED_ENV:
-        pre = re.sub(r"\b" + name + _ASSIGN, "", pre)
+def _strip_env(pre, names=None):
+    for name in (names if names is not None else _MANAGED_ENV):
+        pre = re.sub(r"\b" + re.escape(name) + _ASSIGN, "", pre)
     return " ".join(pre.split())
 
 
-def merge_launch(existing, proxy, dinput8, fsr4):
+def _strip_post_args(post, args):
+    if not args or not post:
+        return post
+    tokens = post.split()
+    drop = set(args)
+    kept = [t for t in tokens if t not in drop]
+    return (" " + " ".join(kept)) if kept else ""
+
+
+def merge_launch(existing, proxy, dinput8, fsr4, extra_env=None, extra_args=None, prev_env=None, prev_args=None):
     pre, post = _split_command(existing)
     drop = {p[:-4] for p in PROXIES} | ({"dinput8"} if dinput8 else set())
     pre, kept = _overrides(pre, drop)
-    pre = _strip_env(pre)
+    env_to_strip = list(_MANAGED_ENV) + list(prev_env or []) + list((extra_env or {}).keys())
+    pre = _strip_env(pre, env_to_strip)
+    if prev_args:
+        post = _strip_post_args(post, prev_args)
     ours = [proxy[:-4]] + (["dinput8"] if dinput8 else [])
     parts = ['WINEDLLOVERRIDES="%s"' % ";".join(kept + [",".join(ours) + "=n,b"]), "PROTON_ENABLE_NVAPI=1"]
     if fsr4:
         parts.append("PROTON_FSR4_UPGRADE=1")
+    for k, v in (extra_env or {}).items():
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(k)):
+            parts.append("%s=%s" % (k, v))
     if pre:
         parts.append(pre)
+    existing_post_tokens = set(post.split())
+    for arg in (extra_args or []):
+        if arg and arg not in existing_post_tokens:
+            post = (post + " " + arg) if post else (" " + arg)
     return " ".join(parts) + " %command%" + post
 
 
-def strip_launch(existing, dinput8):
+def strip_launch(existing, dinput8, prev_env=None, prev_args=None):
     pre, post = _split_command(existing)
     drop = {p[:-4] for p in PROXIES} | ({"dinput8"} if dinput8 else set())
     pre, kept = _overrides(pre, drop)
-    pre = _strip_env(pre)
+    pre = _strip_env(pre, list(_MANAGED_ENV) + list(prev_env or []))
+    if prev_args:
+        post = _strip_post_args(post, prev_args)
     parts = (['WINEDLLOVERRIDES="%s"' % ";".join(kept)] if kept else []) + ([pre] if pre else [])
     if not parts:
         return post.strip()
@@ -304,7 +340,14 @@ class Core:
         shutil.rmtree(os.path.join(self.data, "anr"), ignore_errors=True)  # 0.1.0's cache of the "full" package
         self.state_path = os.path.join(self.data, "state.json")
         self.settings_path = os.path.join(self.data, "settings.json")
+        self.profiles = ProfileDB(self.data, self.log)
         self._fetch_lock = threading.Lock()  # the start-up check and the button can overlap
+
+    def profiles_meta(self):
+        return self.profiles.meta()
+
+    def protondb(self, appid):
+        return fetch_protondb(appid, self.data, _curl)
 
     # ---- settings
 
@@ -494,6 +537,10 @@ class Core:
             else:
                 st = self._save_state(checked_at=int(time.time()), pinned=False if force else st["pinned"])
             self._prune(st)
+            try:
+                self.profiles.refresh(_curl)
+            except Exception as e:
+                self.log("profiles DB refresh skipped: %s" % e)
             return dict(st, changed=changed)
 
     def rollback(self):
@@ -550,13 +597,22 @@ class Core:
 
     @staticmethod
     def _scan(root):
-        """One bounded walk of the game folder: the .exe files, markers and any install of ours."""
-        exes, marks = [], {"dlssg": False, "anticheat": False, "record": None}
+        """One bounded walk of the game folder: the .exe files, upscaler/anti-cheat markers and any install of ours."""
+        exes = []
+        marks = {
+            "dlss": False,
+            "dlssg": False,
+            "streamline": False,
+            "fsr": False,
+            "xess": False,
+            "anticheat": False,
+            "record": None,
+        }
         base = root.rstrip(os.sep).count(os.sep)
         for cur, dirs, files in os.walk(root):
             depth = cur.count(os.sep) - base
             low = {d.lower() for d in dirs}
-            if low & {"easyanticheat", "battleye"}:
+            if low & {"easyanticheat", "battleye", "eaanticheat", "vanguard"}:
                 marks["anticheat"] = True
             if "OptiScaler" in dirs and any(os.path.isfile(os.path.join(cur, "OptiScaler", n))
                                             for n in ("greenscaler.json", "nr_fg_install.json")):
@@ -564,13 +620,62 @@ class Core:
             dirs[:] = [] if depth >= 5 else [d for d in dirs if d.lower() not in SKIP_DIRS and not d.startswith(".")]
             for name in files:
                 lname = name.lower()
-                if lname in ("nvngx_dlssg.dll", "sl.dlss_g.dll"):
+                if lname in ("nvngx_dlss.dll", "sl.dlss.dll"):
+                    marks["dlss"] = True
+                elif lname in ("nvngx_dlssg.dll", "sl.dlss_g.dll"):
                     marks["dlssg"] = True
+                elif lname in ("sl.interposer.dll", "sl.common.dll"):
+                    marks["streamline"] = True
+                elif lname.startswith(("amd_fidelityfx_", "ffx_fsr")) and lname.endswith(".dll"):
+                    marks["fsr"] = True
+                elif lname in ("libxess.dll", "libxess_dx11.dll", "libxess_fg.dll"):
+                    marks["xess"] = True
+                elif lname in ("start_protected_game.exe", "eac_launcher.exe", "eaanticheat.gameservicelauncher.exe"):
+                    marks["anticheat"] = True
                 elif lname.endswith(".exe"):
                     try:
                         exes.append((os.path.getsize(os.path.join(cur, name)), cur, name))
                     except OSError:
                         pass
+        # Unreal Engine 4/5 places DLSS/Streamline/XeSS/FSR plugins inside Engine/Plugins/ or <Game>/Plugins/ (depth 6-8).
+        plugin_roots = []
+        eng_plugins = os.path.join(root, "Engine", "Plugins")
+        if os.path.isdir(eng_plugins):
+            plugin_roots.append(eng_plugins)
+        try:
+            for d in os.listdir(root):
+                cand = os.path.join(root, d, "Plugins")
+                if d.lower() != "engine" and os.path.isdir(cand):
+                    plugin_roots.append(cand)
+        except OSError:
+            pass
+        for pr in plugin_roots:
+            pbase = pr.rstrip(os.sep).count(os.sep)
+            for cur, dirs, files in os.walk(pr):
+                pdepth = cur.count(os.sep) - pbase
+                if pdepth >= 6:
+                    dirs[:] = []
+                low_dirs = {d.lower() for d in dirs}
+                if "dlss" in low_dirs:
+                    marks["dlss"] = True
+                if "streamline" in low_dirs:
+                    marks["streamline"] = True
+                if "xess" in low_dirs:
+                    marks["xess"] = True
+                if any(d.startswith("fsr") for d in low_dirs):
+                    marks["fsr"] = True
+                for name in files:
+                    lname = name.lower()
+                    if lname in ("nvngx_dlss.dll", "sl.dlss.dll"):
+                        marks["dlss"] = True
+                    elif lname in ("nvngx_dlssg.dll", "sl.dlss_g.dll"):
+                        marks["dlssg"] = True
+                    elif lname in ("sl.interposer.dll", "sl.common.dll"):
+                        marks["streamline"] = True
+                    elif lname.startswith(("amd_fidelityfx_", "ffx_fsr")) and lname.endswith(".dll"):
+                        marks["fsr"] = True
+                    elif lname in ("libxess.dll", "libxess_dx11.dll", "libxess_fg.dll"):
+                        marks["xess"] = True
         return exes, marks
 
     @staticmethod
@@ -587,7 +692,32 @@ class Core:
         return {"fsr4": get("Upscalers", "Dx12Upscaler") == "ffx", "fg": fg,
                 "fsr4_model": model if model in ("0", "1", "2", "3") else "auto"}
 
-    def _describe(self, lib, acf):
+    def _recommended_options(self, marks, re_engine, profile, exe_path):
+        rec = self.default_options()
+        rec["proxy"] = "auto"
+        if profile:
+            if profile.get("proxy") in PROXIES:
+                rec["proxy"] = profile["proxy"]
+            if profile.get("streamline"):
+                rec["streamline"] = True
+            if profile.get("reframework"):
+                rec["reframework"] = True
+            if profile.get("status") == "broken":
+                rec["fg"] = "off"
+        if marks.get("streamline") and marks.get("dlssg"):
+            rec["streamline"] = True
+        if not marks.get("dlssg") and not (profile and profile.get("streamline")):
+            rec["fg"] = "off"
+        if re_engine:
+            rec["reframework"] = True
+        if rec["proxy"] == "auto":
+            detected_proxy = self._detect_proxy(exe_path)
+            if detected_proxy != "dxgi.dll":
+                rec["proxy"] = detected_proxy
+        rec["profile_tweaks"] = True
+        return rec
+
+    def _describe(self, lib, acf, proton_ctx=None):
         root = os.path.join(lib, "common", acf["installdir"])
         if SKIP_NAME.match(acf["name"]) or not os.path.isdir(root):
             return None
@@ -615,19 +745,37 @@ class Core:
         current = meta.get("options") if managed else None
         if legacy:
             current = self._options_from_ini(os.path.join(exe_dir, "OptiScaler.ini"))
+        re_engine = any(n.startswith("re_chunk_000.pak") for n in os.listdir(root))
+        profile = self.profiles.lookup(acf["appid"], acf["name"])
+        anticheat = bool(marks["anticheat"] or (profile and profile.get("anticheat")))
+        if proton_ctx is None:
+            roots = self.steam_roots()
+            proton_ctx = (read_proton_mapping(roots), list_custom_protons(roots))
+        (pmap, pdef), custom_protons = proton_ctx
+        ptool = pmap.get(str(acf["appid"]))
+        proton_info = classify_proton(ptool or pdef, custom_protons, is_default=not bool(ptool) and bool(pdef))
+        recommended = self._recommended_options(marks, re_engine, profile, os.path.join(exe_dir, exe))
         return {
             "appid": acf["appid"], "name": acf["name"], "root": root, "exe_dir": exe_dir, "exe": exe,
             "installed": installed, "managed": managed, "legacy": legacy, "foreign": foreign,
             "opti": meta.get("opti") if managed else None, "anr": meta.get("anr") if managed else None,
+            "proxy": meta.get("proxy") if managed else None,
             "outdated": managed and (meta.get("opti"), meta.get("anr")) != (st["opti"], st["anr"]),
-            "has_dlssg": marks["dlssg"], "anticheat": marks["anticheat"],
-            "re_engine": any(n.startswith("re_chunk_000.pak") for n in os.listdir(root)),
+            "has_dlss": marks["dlss"], "has_dlssg": marks["dlssg"],
+            "has_streamline": marks["streamline"], "has_fsr": marks["fsr"], "has_xess": marks["xess"],
+            "anticheat": anticheat,
+            "re_engine": re_engine,
             "has_reframework": os.path.isfile(os.path.join(exe_dir, "dinput8.dll")),
+            "proton": proton_info,
+            "profile": profile,
+            "recommended": recommended,
             "options": self.options_for(acf["appid"], current),
         }
 
     def games(self):
         out, seen = [], set()
+        roots = self.steam_roots()
+        proton_ctx = (read_proton_mapping(roots), list_custom_protons(roots))
         for lib in self.libraries():
             try:
                 names = sorted(os.listdir(lib))
@@ -639,7 +787,7 @@ class Core:
                 acf = self._acf(os.path.join(lib, name))
                 if not acf or acf["appid"] in seen:
                     continue
-                g = self._describe(lib, acf)
+                g = self._describe(lib, acf, proton_ctx)
                 if g:
                     seen.add(acf["appid"])
                     out.append(g)
@@ -859,13 +1007,42 @@ class Core:
         meta = read_json(meta_path, {}) or {}
         fresh = not g["installed"]
         os.makedirs(backup, exist_ok=True)
+        profile = g.get("profile") or {}
+        want_proxy = opts.get("proxy", "auto")
+        prev_env = list(meta.get("applied_env") or [])
+        prev_args = list(meta.get("applied_args") or [])
+
         if g["managed"]:
-            proxy = meta.get("proxy") or "dxgi.dll"
+            old_proxy = meta.get("proxy") or "dxgi.dll"
+            proxy = want_proxy if want_proxy in PROXIES else old_proxy
+            if proxy != old_proxy:
+                # Safely swap proxies: restore or remove old proxy, then back up any original at new proxy path
+                originals = meta.get("originals") or {}
+                old_dst = os.path.join(game, old_proxy)
+                if old_proxy in originals:
+                    if sha256(os.path.join(backup, old_proxy)) != originals[old_proxy]:
+                        raise GsError("o backup de %s não confere; troca de proxy cancelada" % old_proxy)
+                    copy_over(os.path.join(backup, old_proxy), old_dst)
+                    originals.pop(old_proxy, None)
+                elif os.path.lexists(old_dst):
+                    os.remove(old_dst)
+                new_dst = os.path.join(game, proxy)
+                if os.path.exists(new_dst) and proxy not in originals:
+                    shutil.copy2(new_dst, os.path.join(backup, proxy))
+                    if sha256(os.path.join(backup, proxy)) != sha256(new_dst):
+                        raise GsError("o backup de %s não confere" % proxy)
+                    originals[proxy] = sha256(new_dst)
+                meta["originals"] = originals
         elif g["legacy"]:
             proxy, originals = self._adopt_legacy(opti, backup)
             meta.update({"originals": originals})
         else:
-            proxy = self._detect_proxy(os.path.join(game, g["exe"]))
+            if want_proxy in PROXIES:
+                proxy = want_proxy
+            elif profile.get("proxy") in PROXIES:
+                proxy = profile["proxy"]
+            else:
+                proxy = self._detect_proxy(os.path.join(game, g["exe"]))
             originals = {}
             for name in (proxy, "OptiScaler.ini"):
                 path = os.path.join(game, name)
@@ -938,8 +1115,11 @@ class Core:
             before = {k: ini_get(base, "FrameGen", k) or "" for k in ("FGInput", "FGNvngxReplacement", "DisableHudless")}
             with open(record, "w") as f:
                 f.write(json.dumps({"optiscaler_ini": ini_path, "before": before}) + "\n")
+        extra_ini = profile.get("ini") if opts.get("profile_tweaks", True) else None
+        extra_env = dict(profile.get("env") or {}) if opts.get("profile_tweaks", True) else {}
+        extra_args = list(profile.get("launch_args") or []) if opts.get("profile_tweaks", True) else []
         with open(ini_path, "wb") as f:
-            f.write(apply_options(base, opts).encode("latin-1"))
+            f.write(apply_options(base, opts, extra_ini=extra_ini).encode("latin-1"))
 
         sl_tag = None
         sl_dir = os.path.join(opti, "streamline")
@@ -976,13 +1156,17 @@ class Core:
         dinput8 = bool(meta.get("reframework_sha"))
         meta.pop("version", None)
         meta.update({"opti": st["opti"], "anr": st["anr"], "options": {k: opts[k] for k in DEFAULTS},
+                     "applied_env": list(extra_env.keys()), "applied_args": extra_args,
                      "installed_at": int(time.time())})
         write_json(meta_path, meta)
         self._remember(appid, opts)
         self.log("installed OptiScaler %s + ANR %s in %s as %s" % (st["opti"], st["anr"], game, proxy))
         return {"ok": True, "appid": g["appid"], "opti": st["opti"], "anr": st["anr"], "proxy": proxy,
                 "dinput8": dinput8, "fsr4": bool(opts.get("fsr4")), "reframework": ref_tag,
-                "streamline": sl_tag, "mfg_unlocker": mfg_tag, "warning": "; ".join(warn) or None}
+                "streamline": sl_tag, "mfg_unlocker": mfg_tag,
+                "extra_env": extra_env, "extra_args": extra_args,
+                "prev_env": prev_env, "prev_args": prev_args,
+                "warning": "; ".join(warn) or None}
 
     def uninstall(self, appid):
         g = self.game(appid)
@@ -1024,9 +1208,12 @@ class Core:
         log = os.path.join(game, "OptiScaler.log")
         if os.path.exists(log):
             os.remove(log)
+        prev_env = list(meta.get("applied_env") or [])
+        prev_args = list(meta.get("applied_args") or [])
         shutil.rmtree(opti)
         self.log("uninstalled from %s" % game)
-        return {"ok": True, "appid": g["appid"], "dinput8": dinput8}
+        return {"ok": True, "appid": g["appid"], "dinput8": dinput8,
+                "prev_env": prev_env, "prev_args": prev_args}
 
     def apply_updates(self):
         """Reinstalls the current versions in every managed game that has other ones. Skips running games."""

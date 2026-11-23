@@ -17,9 +17,45 @@ interface Options {
   fsr4: boolean;
   fsr4_model: string;
   fg: string;
+  proxy: string;
   streamline: boolean;
   mfg_unlocker: boolean;
   reframework: boolean;
+  profile_tweaks: boolean;
+}
+
+interface ProtonInfo {
+  tool: string | null;
+  label: string;
+  fsr4_ready: boolean;
+  level: string;
+  hint: string;
+}
+
+interface GameProfile {
+  title?: string;
+  status?: string;
+  source?: string;
+  inputs?: string[];
+  fg_inputs?: string[];
+  proxy?: string;
+  streamline?: boolean;
+  optipatcher?: boolean;
+  linux_tested?: boolean;
+  anticheat?: boolean;
+  ini?: Record<string, Record<string, string>>;
+  env?: Record<string, string>;
+  launch_args?: string[];
+  note?: string;
+  wiki_page?: string;
+}
+
+interface ProtonDBInfo {
+  ok: boolean;
+  tier: string | null;
+  trending?: string | null;
+  best?: string | null;
+  total?: number;
 }
 
 interface Game {
@@ -32,11 +68,26 @@ interface Game {
   outdated: boolean;
   opti: string | null;
   anr: string | null;
+  proxy: string | null;
+  has_dlss: boolean;
   has_dlssg: boolean;
+  has_streamline: boolean;
+  has_fsr: boolean;
+  has_xess: boolean;
   anticheat: boolean;
   re_engine: boolean;
   has_reframework: boolean;
+  proton: ProtonInfo;
+  profile: GameProfile | null;
+  recommended: Options;
   options: Options;
+}
+
+interface ProfilesMeta {
+  count: number;
+  curated: number;
+  wiki_commit: string;
+  generated_at: string;
 }
 
 interface State {
@@ -49,6 +100,7 @@ interface State {
   prev: { opti: string | null; anr: string | null } | null;
   pinned: boolean;
   ready: boolean;
+  profiles?: ProfilesMeta;
 }
 
 interface Result {
@@ -64,6 +116,7 @@ interface Result {
 }
 
 const getState = callable<[], State>("get_state");
+const getProtonDB = callable<[appid: string], ProtonDBInfo>("get_protondb");
 const checkUpdate = callable<[], Result>("check_update");
 const rollback = callable<[], Result>("rollback");
 const saveSettings = callable<[patch: Record<string, unknown>], unknown>("save_settings");
@@ -87,6 +140,23 @@ const MODEL_CHOICES = [
   { data: "2", label: "INT8 RDNA 2" },
   { data: "3", label: "INT8 Lite (portáteis)" },
 ];
+
+const PROXY_CHOICES = [
+  { data: "auto", label: "Automático (Wiki / Engine)" },
+  { data: "dxgi.dll", label: "dxgi.dll (DX12 padrão)" },
+  { data: "winmm.dll", label: "winmm.dll (Vulkan / alternativo)" },
+  { data: "version.dll", label: "version.dll (alternativo)" },
+];
+
+const PROTONDB_LABELS: Record<string, string> = {
+  platinum: "Platinum",
+  gold: "Gold",
+  silver: "Silver",
+  bronze: "Bronze",
+  borked: "Borked",
+  native: "Native",
+  pending: "Pendente",
+};
 
 // Steam only hands out an app's launch options through the details callback.
 function currentLaunchOptions(appid: number): Promise<string> {
@@ -145,19 +215,59 @@ const ui: {
   selected: string | null;
   context: string | null | undefined;
   edits: Record<string, Options>;
+  protondb: Record<string, ProtonDBInfo>;
   state: State | null;
 } = {
   context: undefined,
   selected: null,
   edits: {},
+  protondb: {},
   state: null,
 };
+
+function summarizeDetected(g: Game): string {
+  const tags: string[] = [];
+  if (g.has_dlss) tags.push("DLSS");
+  if (g.has_dlssg) tags.push("DLSS-G");
+  if (g.has_streamline) tags.push("Streamline");
+  if (g.has_fsr) tags.push("FSR");
+  if (g.has_xess) tags.push("XeSS");
+  if (g.re_engine) tags.push("RE Engine");
+  return tags.length ? tags.join(" · ") : "Nenhum upscaler detectado no disco";
+}
+
+function summarizeProfileTweaks(p: GameProfile | null): string {
+  if (!p) return "";
+  const parts: string[] = [];
+  if (p.proxy) parts.push("proxy " + p.proxy);
+  if (p.streamline) parts.push("Streamline");
+  if (p.env) {
+    for (const [k, v] of Object.entries(p.env)) parts.push(`${k}=${v}`);
+  }
+  if (p.launch_args?.length) parts.push(p.launch_args.join(" "));
+  if (p.ini) {
+    for (const [sec, kv] of Object.entries(p.ini)) {
+      for (const [k, v] of Object.entries(kv)) parts.push(`[${sec}] ${k}=${v}`);
+    }
+  }
+  return parts.join(" · ");
+}
+
+function hasExtraTweaks(p: GameProfile | null): boolean {
+  if (!p) return false;
+  return Boolean(
+    (p.ini && Object.keys(p.ini).length > 0) ||
+      (p.env && Object.keys(p.env).length > 0) ||
+      (p.launch_args && p.launch_args.length > 0)
+  );
+}
 
 function Content() {
   const [state, setStateRaw] = useState<State | null>(ui.state);
   const [busy, setBusy] = useState<string | null>(null);
   const [selected, setSelectedRaw] = useState<string | null>(ui.selected);
   const [edits, setEditsRaw] = useState<Record<string, Options>>(ui.edits);
+  const [pdbMap, setPdbMapRaw] = useState<Record<string, ProtonDBInfo>>(ui.protondb);
 
   const setState = (s: State) => {
     ui.state = s;
@@ -170,6 +280,10 @@ function Content() {
   const setEdits = (e: Record<string, Options>) => {
     ui.edits = e;
     setEditsRaw(e);
+  };
+  const setPdb = (appid: string, info: ProtonDBInfo) => {
+    ui.protondb = { ...ui.protondb, [appid]: info };
+    setPdbMapRaw(ui.protondb);
   };
 
   const refresh = async () => {
@@ -194,6 +308,19 @@ function Content() {
     refresh();
   }, []);
 
+  useEffect(() => {
+    if (!selected || ui.protondb[selected]) return;
+    let alive = true;
+    getProtonDB(selected)
+      .then((info) => {
+        if (alive && info) setPdb(selected, info);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [selected]);
+
   if (!state) {
     return (
       <PanelSection>
@@ -215,6 +342,7 @@ function Content() {
 
   const game = state.games.find((g) => g.appid === selected) ?? null;
   const opts: Options | null = game ? edits[game.appid] ?? game.options : null;
+  const pdb: ProtonDBInfo | null = game ? pdbMap[game.appid] ?? null : null;
   const setOpt = (patch: Partial<Options>) => {
     if (game && opts) setEdits({ ...edits, [game.appid]: { ...opts, ...patch } });
   };
@@ -225,9 +353,10 @@ function Content() {
       await work();
     } catch (e) {
       notify("GreenScaler", "Falhou: " + String(e));
+    } finally {
+      setBusy(null);
+      await refresh();
     }
-    setBusy(null);
-    await refresh();
   };
 
   const onCheck = () =>
@@ -246,6 +375,16 @@ function Content() {
       if (!r.ok) return notify("GreenScaler", r.error ?? "Falhou");
       notify("GreenScaler", "Voltou para " + r.opti + " + ANR " + r.anr + ". A atualização automática fica pausada até a próxima busca manual.");
     });
+
+  const onLoadRecommended = () => {
+    if (!game) return;
+    setEdits({ ...edits, [game.appid]: { ...game.recommended } });
+    const tweaks = summarizeProfileTweaks(game.profile);
+    notify(
+      game.name,
+      "Perfil recomendado carregado" + (tweaks ? " (" + tweaks + ")" : "") + ". Clique em Instalar/Aplicar para gravar."
+    );
+  };
 
   const onInstall = () =>
     run("Instalando...", async () => {
@@ -274,7 +413,24 @@ function Content() {
     if (g.foreign) return "OptiScaler de outra origem";
     if (!g.installed) return "Não instalado";
     if (g.legacy) return "Instalação antiga ou feita à mão: Aplicar converte para OptiScaler nightly + ANR add-on";
-    return "OptiScaler " + g.opti + " + ANR " + g.anr + (g.outdated ? " (atualização disponível)" : "");
+    const px = g.proxy ? " · " + g.proxy : "";
+    return "OptiScaler " + g.opti + " + ANR " + g.anr + px + (g.outdated ? " (atualização disponível)" : "");
+  };
+
+  const profileHeader = (p: GameProfile) => {
+    const badges: string[] = [];
+    if (p.status === "broken") badges.push("❌ Incompatível");
+    else if (p.status === "partial") badges.push("⚠️ Parcial");
+    else badges.push("✅ Compatível");
+    if (p.linux_tested) badges.push("🐧 Linux");
+    if (p.optipatcher) badges.push("✨ OptiPatcher");
+    return badges.join(" · ");
+  };
+
+  const protonLine = (g: Game) => {
+    const tier = pdb?.ok && pdb.tier ? PROTONDB_LABELS[pdb.tier.toLowerCase()] ?? pdb.tier : null;
+    const base = g.proton.label + (tier ? ` · ProtonDB: ${tier}` : "");
+    return g.proton.hint ? `${base} — ${g.proton.hint}` : base;
   };
 
   return (
@@ -289,6 +445,14 @@ function Content() {
             description={(state.ready ? state.anr : "não baixado") + (state.pinned ? " · fixadas pelo retorno de versão" : "")}
           />
         </PanelSectionRow>
+        {state.profiles && (
+          <PanelSectionRow>
+            <Field
+              label="Base Wiki OptiScaler"
+              description={`${state.profiles.count} jogos (${state.profiles.curated} perfis Proton curados)`}
+            />
+          </PanelSectionRow>
+        )}
         <PanelSectionRow>
           <ButtonItem layout="below" disabled={!!busy} onClick={onCheck}>
             {busy ?? "Buscar atualização"}
@@ -304,7 +468,7 @@ function Content() {
         <PanelSectionRow>
           <ToggleField
             label="Atualizar sozinho"
-            description="Busca o OptiScaler nightly e o ANR mais novos ao iniciar e reaplica nos jogos gerenciados"
+            description="Busca o OptiScaler nightly, ANR e a base da Wiki ao iniciar e reaplica nos jogos gerenciados"
             checked={state.settings.auto_update}
             onChange={async (v) => {
               await saveSettings({ auto_update: v, auto_apply: v });
@@ -333,7 +497,39 @@ function Content() {
             <PanelSectionRow>
               <Field label="Estado" description={status(game)} />
             </PanelSectionRow>
-            {!game.has_dlssg && (
+            <PanelSectionRow>
+              <Field label="Detectado no disco" description={summarizeDetected(game)} />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <Field
+                label={game.proton.level === "warn" && opts.fsr4 ? "⚠️ Proton" : "Proton"}
+                description={protonLine(game)}
+              />
+            </PanelSectionRow>
+            {game.profile && (
+              <>
+                <PanelSectionRow>
+                  <Field
+                    label={"Wiki OptiScaler · " + profileHeader(game.profile)}
+                    description={
+                      [
+                        game.profile.inputs?.length ? "Inputs: " + game.profile.inputs.join(", ") : "",
+                        summarizeProfileTweaks(game.profile) ? "Ajustes: " + summarizeProfileTweaks(game.profile) : "",
+                        game.profile.note ?? "",
+                      ]
+                        .filter(Boolean)
+                        .join(" — ")
+                    }
+                  />
+                </PanelSectionRow>
+                <PanelSectionRow>
+                  <ButtonItem layout="below" disabled={!!busy} onClick={onLoadRecommended}>
+                    Carregar perfil recomendado
+                  </ButtonItem>
+                </PanelSectionRow>
+              </>
+            )}
+            {!game.has_dlssg && !game.profile?.streamline && (
               <PanelSectionRow>
                 <Field
                   label="Sem DLSS Frame Generation"
@@ -344,7 +540,7 @@ function Content() {
             {game.anticheat && (
               <PanelSectionRow>
                 <Field
-                  label="Anti-cheat detectado"
+                  label="⚠️ Anti-cheat detectado"
                   description="Jogos online com anti-cheat podem banir por arquivos modificados. Use por sua conta e risco."
                 />
               </PanelSectionRow>
@@ -377,6 +573,15 @@ function Content() {
               />
             </PanelSectionRow>
             <PanelSectionRow>
+              <DropdownItem
+                label="Proxy DLL"
+                description="Automático usa a recomendação da Wiki ou detecta DX12/Vulkan"
+                rgOptions={PROXY_CHOICES}
+                selectedOption={opts.proxy ?? "auto"}
+                onChange={(o) => setOpt({ proxy: o.data })}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
               <ToggleField
                 label="Streamline SDK (DLSSG via SL)"
                 description="Baixa as DLLs NVIDIA Streamline para OptiScaler/streamline/ (ex.: Dawnwalker; desligue o VSync no jogo)"
@@ -392,6 +597,16 @@ function Content() {
                 onChange={(v) => setOpt({ mfg_unlocker: v })}
               />
             </PanelSectionRow>
+            {hasExtraTweaks(game.profile) && (
+              <PanelSectionRow>
+                <ToggleField
+                  label="Ajustes do perfil (Wiki / Proton)"
+                  description={summarizeProfileTweaks(game.profile)}
+                  checked={opts.profile_tweaks !== false}
+                  onChange={(v) => setOpt({ profile_tweaks: v })}
+                />
+              </PanelSectionRow>
+            )}
             {game.re_engine && (
               <PanelSectionRow>
                 <ToggleField

@@ -13,8 +13,10 @@ Plugin do **Decky Loader** para **SteamOS / Linux** (Steam Deck, Lenovo Legion G
 
 ## O que faz
 
-- **Seleção automática do jogo:** escaneia todas as bibliotecas Steam, seleciona automaticamente o jogo aberto na biblioteca ou em execução, e detecta DLSS-G, anti-cheat e RE Engine.
-- **Instalação limpa com backup e rollback:** instala o OptiScaler como `dxgi.dll` (ou `winmm.dll` em jogos puramente Vulkan), faz backup verificado por SHA-256 dos originais e restaura tudo ao remover.
+- **Base da Wiki oficial do OptiScaler + Perfis Proton (`715+` jogos):** sincronizada automaticamente a partir de [optiscaler/OptiScaler.wiki](https://github.com/optiscaler/OptiScaler/wiki/Compatibility-List) + perfis curados por AppID (SteamOS/Linux), com botão **Carregar perfil recomendado** (proxy DLL, Streamline, ajustes de `OptiScaler.ini` e flags de Proton como `PROTON_VKD3D_LOWLATENCY=1` / `-dx12`).
+- **Inspetor de Proton + ProtonDB:** lê qual Proton está selecionado no jogo (`config.vdf` + `compatibilitytools.d/`), avisa se o Proton não for ideal para FSR 4 (sugerindo seus `Proton-CachyOS` / `Proton-GE` já instalados) e exibe o selo do **ProtonDB** (com cache local).
+- **Detecção automática no disco:** escaneia todas as bibliotecas Steam (inclusive plugins de Unreal Engine 4/5), seleciona o jogo aberto/em foco e detecta **DLSS, DLSS-G, Streamline, FSR, XeSS, Anti-Cheat e RE Engine**.
+- **Instalação limpa com backup, troca de proxy e rollback:** instala o OptiScaler como `dxgi.dll`, `winmm.dll` ou `version.dll` (automático via Wiki/Engine ou manual pelo QAM), faz backup verificado por SHA-256 dos originais e restaura tudo ao remover.
 - **Preserva suas opções de inicialização:** mescla `WINEDLLOVERRIDES`, `PROTON_ENABLE_NVAPI=1` e `PROTON_FSR4_UPGRADE=1` **sem apagar** o que você já usa (`--steamless`, `PROTON_VKD3D_LOWLATENCY=1`, etc.).
 - **Padrões para portáteis:** em aparelhos com bateria (Steam Deck / Legion Go / ROG Ally), define automaticamente **FG 2X** e **FSR 4 INT8 Lite (`Fsr4Model=3`)**.
 - **Streamline SDK (DLSSG via SL):** toggle com 1 clique para jogos que usam DLSS Frame Generation via Streamline (ex.: *The Blood of Dawnwalker*).

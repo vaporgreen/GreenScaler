@@ -1,0 +1,147 @@
+{
+  "by_appid": {
+    "3751260": {
+      "title": "The Blood of Dawnwalker",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "env": {
+        "PROTON_VKD3D_LOWLATENCY": "1"
+      },
+      "note": "Use DLSSG via Streamline e desligue o VSync no menu do jogo antes de ativar FG. PROTON_VKD3D_LOWLATENCY=1 reduz latência no vkd3d-proton."
+    },
+    "4115450": {
+      "title": "Phantom Blade Zero",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "Unreal Engine 5 com DLSS/Streamline."
+    },
+    "1091500": {
+      "title": "Cyberpunk 2077",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline funcionam bem no Proton com FSR 4 e ANR FG."
+    },
+    "2054970": {
+      "title": "Dragon's Dogma 2",
+      "proxy": "dxgi.dll",
+      "reframework": true,
+      "streamline": true,
+      "ini": {
+        "Spoofing": {
+          "Dxgi": "false"
+        }
+      },
+      "note": "RE Engine: exige REFramework (dinput8.dll) e Dxgi=false em GPUs AMD/Intel."
+    },
+    "2358720": {
+      "title": "Black Myth: Wukong",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados no Proton."
+    },
+    "1903340": {
+      "title": "Clair Obscur: Expedition 33",
+      "proxy": "dxgi.dll",
+      "note": "UE5: inputs DLSS/XeSS funcionam com FSR 4."
+    },
+    "3489700": {
+      "title": "Stellar Blade",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "UE4/DLSS + Streamline suportados no Proton."
+    },
+    "2246340": {
+      "title": "Monster Hunter Wilds",
+      "proxy": "dxgi.dll",
+      "reframework": true,
+      "note": "RE Engine: REFramework recomendado para evitar crashes."
+    },
+    "2050650": {
+      "title": "Resident Evil 4",
+      "proxy": "dxgi.dll",
+      "reframework": true,
+      "note": "RE Engine: REFramework recomendado."
+    },
+    "1174180": {
+      "title": "Red Dead Redemption 2",
+      "proxy": "dxgi.dll",
+      "note": "Use DX12 nas configurações do jogo se quiser FSR 4 via OptiScaler."
+    },
+    "292030": {
+      "title": "The Witcher 3: Wild Hunt",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "Use a versão DX12 (Next-Gen) para DLSS + Streamline FG."
+    },
+    "1888930": {
+      "title": "The Last of Us Part I",
+      "proxy": "dxgi.dll",
+      "note": "DLSS/FSR inputs suportados."
+    },
+    "2531310": {
+      "title": "The Last of Us Part II Remastered",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "2124490": {
+      "title": "SILENT HILL 2",
+      "proxy": "dxgi.dll",
+      "note": "UE5: DLSS/FSR/XeSS suportados com FSR 4."
+    },
+    "1643320": {
+      "title": "S.T.A.L.K.E.R. 2: Heart of Chornobyl",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "UE5: DLSS + DLSSG via Streamline suportados."
+    },
+    "2651280": {
+      "title": "Marvel's Spider-Man 2",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "1817070": {
+      "title": "Marvel's Spider-Man Remastered",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "1817190": {
+      "title": "Marvel's Spider-Man: Miles Morales",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "2322010": {
+      "title": "God of War Ragnarök",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "2215430": {
+      "title": "Ghost of Tsushima DIRECTOR'S CUT",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "2420110": {
+      "title": "Horizon Forbidden West Complete Edition",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "1716740": {
+      "title": "Starfield",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "DLSS + DLSSG via Streamline suportados."
+    },
+    "2623190": {
+      "title": "The Elder Scrolls IV: Oblivion Remastered",
+      "proxy": "dxgi.dll",
+      "streamline": true,
+      "note": "UE5: DLSS + DLSSG via Streamline suportados."
+    }
+  }
+}

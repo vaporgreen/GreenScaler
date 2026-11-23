@@ -42,10 +42,14 @@ class Plugin:
         st = self.core.state()
         return {"ok": True, "games": self.core.games(), "settings": self.core.settings(),
                 "opti": st["opti"], "anr": st["anr"], "prev": st["prev"], "pinned": st["pinned"],
-                "checked_at": st["checked_at"], "ready": self.core.ready(st)}
+                "checked_at": st["checked_at"], "ready": self.core.ready(st),
+                "profiles": self.core.profiles_meta()}
 
     async def get_state(self):
         return await self._run(self._state)
+
+    async def get_protondb(self, appid):
+        return await self._run(self.core.protondb, appid)
 
     async def _apply(self, res, always=False):
         if res.get("ok") is False:
@@ -68,11 +72,18 @@ class Plugin:
     async def install(self, appid, options, launch_options):
         res = await self._run(self.core.install, appid, options)
         if res.get("ok"):
-            res["launch_options"] = merge_launch(launch_options, res["proxy"], res["dinput8"], res["fsr4"])
+            res["launch_options"] = merge_launch(
+                launch_options, res["proxy"], res["dinput8"], res["fsr4"],
+                extra_env=res.get("extra_env"), extra_args=res.get("extra_args"),
+                prev_env=res.get("prev_env"), prev_args=res.get("prev_args"),
+            )
         return res
 
     async def uninstall(self, appid, launch_options):
         res = await self._run(self.core.uninstall, appid)
         if res.get("ok"):
-            res["launch_options"] = strip_launch(launch_options, res["dinput8"])
+            res["launch_options"] = strip_launch(
+                launch_options, res["dinput8"],
+                prev_env=res.get("prev_env"), prev_args=res.get("prev_args"),
+            )
         return res

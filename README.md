@@ -13,8 +13,10 @@ A **Decky Loader** plugin for **SteamOS / Linux** (Steam Deck, Lenovo Legion Go,
 
 ## Features
 
-- **Per-Game Detection & Context Auto-Select:** scans all Steam libraries, automatically selects the currently focused or running game in Gaming Mode, detects DLSS-G, anti-cheat, and RE Engine.
-- **Clean Install / Backup / Uninstall:** deploys OptiScaler as `dxgi.dll` (or `winmm.dll` for pure-Vulkan games), backs up original game files with SHA-256 verification, and restores the folder cleanly on uninstall.
+- **OptiScaler Wiki + Proton Profile Database (`715+` games):** automatically synced from [optiscaler/OptiScaler.wiki](https://github.com/optiscaler/OptiScaler/wiki/Compatibility-List) + curated Linux/Proton AppID overrides, with a 1-click **Load recommended profile** button (proxy DLL, Streamline, `OptiScaler.ini` overrides, and Proton flags such as `PROTON_VKD3D_LOWLATENCY=1` / `-dx12`).
+- **Proton Inspector + ProtonDB:** reads the game's assigned Proton (`config.vdf` + `compatibilitytools.d/`), warns when a Proton build may lack FSR 4 support (suggesting your installed `Proton-CachyOS` / `Proton-GE`), and shows the cached **ProtonDB** tier.
+- **Per-Game Disk Scanner & Context Auto-Select:** scans all Steam libraries (including Unreal Engine 4/5 plugin directories), auto-selects the focused/running game in Gaming Mode, and detects **DLSS, DLSS-G, Streamline, FSR, XeSS, Anti-Cheat, and RE Engine**.
+- **Clean Install / Proxy Swap / Uninstall:** deploys OptiScaler as `dxgi.dll`, `winmm.dll`, or `version.dll` (automatic via Wiki/Engine or manual override in QAM), backs up original game files with SHA-256 verification, and restores everything cleanly on uninstall.
 - **Smart Launch Options Merging:** adds `WINEDLLOVERRIDES`, `PROTON_ENABLE_NVAPI=1`, and `PROTON_FSR4_UPGRADE=1` while **preserving existing options** (such as `--steamless`, `PROTON_VKD3D_LOWLATENCY=1`, etc.).
 - **Handheld-Tuned Defaults:** on battery-powered devices (Steam Deck / Legion Go / ROG Ally), defaults to **FG 2X** and **FSR 4 INT8 Lite (`Fsr4Model=3`)**.
 - **Streamline SDK Fetcher (Linux):** 1-click toggle for games that use **DLSSG via Streamline** (e.g., *The Blood of Dawnwalker*).
