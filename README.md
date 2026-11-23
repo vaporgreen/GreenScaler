@@ -2,6 +2,12 @@
 
 **English** | [Português (Brasil)](README.pt-BR.md)
 
+[![Latest Release](https://img.shields.io/github/v/release/vaporgreen/GreenScaler?style=flat-square&color=4caf50&label=release)](https://github.com/vaporgreen/GreenScaler/releases/latest)
+[![Total Downloads](https://img.shields.io/github/downloads/vaporgreen/GreenScaler/total?style=flat-square&color=2e7d32&label=downloads)](https://github.com/vaporgreen/GreenScaler/releases)
+[![Profile Sync CI](https://img.shields.io/github/actions/workflow/status/vaporgreen/GreenScaler/sync-profiles.yml?style=flat-square&label=OptiScaler%20Profiles%20DB)](https://github.com/vaporgreen/GreenScaler/actions/workflows/sync-profiles.yml)
+[![GitHub Stars](https://img.shields.io/github/stars/vaporgreen/GreenScaler?style=flat-square&color=81c784)](https://github.com/vaporgreen/GreenScaler/stargazers)
+![Platform](https://img.shields.io/badge/platform-SteamOS%20%7C%20Decky%20Loader-1a2416?style=flat-square)
+
 A **Decky Loader** plugin for **SteamOS / Linux** (Steam Deck, Lenovo Legion Go, Bazzite, CachyOS) that installs and keeps up to date **OptiScaler nightly** + **ANR FG** (Apex Neural Rendering Frame Generation) + optional **NVIDIA Streamline SDK** + **MFG Unlocker (ASI plugin)** + **REFramework** per Proton game — with **FSR 4** enabled by default and handheld-tuned presets.
 
 > **Nothing is redistributed.** GreenScaler fetches official upstream releases directly on demand and verifies SHA-256 checksums before touching any game folder:
