@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="GreenScaler" width="180" />
+<img src="docs/logo.png" alt="GreenScaler" width="230" />
 
 # GreenScaler
 
