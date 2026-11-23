@@ -1,6 +1,14 @@
-# GreenScaler (Plugin do Decky Loader)
+<div align="center">
 
-[English](README.md) | **Português (Brasil)**
+<img src="docs/logo.png" alt="GreenScaler" width="180" />
+
+# GreenScaler
+
+**Plugin do Decky Loader para SteamOS & Linux (Steam Deck, Legion Go, Bazzite, CachyOS) que instala e atualiza OptiScaler nightly + ANR FG + Streamline + MFG Unlocker + REFramework com FSR 4 por padrão.**
+
+[English](README.md) | **Português (Brasil)** | [O que faz](#o-que-faz) | [Instalação](#instalação-decky-loader) | [Requisitos](#requisitos) | [Build](#build-a-partir-do-código-fonte) | [Releases](https://github.com/vaporgreen/GreenScaler/releases/latest)
+
+<br />
 
 [![Última Release](https://img.shields.io/github/v/release/vaporgreen/GreenScaler?style=flat-square&color=4caf50&label=release)](https://github.com/vaporgreen/GreenScaler/releases/latest)
 [![Downloads Totais](https://img.shields.io/github/downloads/vaporgreen/GreenScaler/total?style=flat-square&color=2e7d32&label=downloads)](https://github.com/vaporgreen/GreenScaler/releases)
@@ -8,7 +16,7 @@
 [![Estrelas no GitHub](https://img.shields.io/github/stars/vaporgreen/GreenScaler?style=flat-square&color=81c784)](https://github.com/vaporgreen/GreenScaler/stargazers)
 ![Plataforma](https://img.shields.io/badge/platform-SteamOS%20%7C%20Decky%20Loader-1a2416?style=flat-square)
 
-Plugin do **Decky Loader** para **SteamOS / Linux** (Steam Deck, Lenovo Legion Go, Bazzite, CachyOS) que instala e mantém atualizado o **OptiScaler nightly** + **ANR FG** (Apex Neural Rendering, geração de quadros) + **NVIDIA Streamline SDK** opcional + **MFG Unlocker (plugin ASI)** + **REFramework** em jogos Proton, com **FSR 4** ativado por padrão e perfis otimizados para portáteis.
+</div>
 
 > **O plugin não redistribui nada.** Ele baixa os lançamentos oficiais sob demanda e valida os checksums SHA-256 antes de alterar qualquer arquivo do jogo:
 > - [optiscaler/OptiScaler-nightly](https://github.com/optiscaler/OptiScaler-nightly/releases) (`.7z`, conferido com o SHA-256 do release)

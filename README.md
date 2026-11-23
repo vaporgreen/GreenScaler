@@ -1,6 +1,14 @@
-# GreenScaler (Decky Loader Plugin)
+<div align="center">
 
-**English** | [Português (Brasil)](README.pt-BR.md)
+<img src="docs/logo.png" alt="GreenScaler" width="180" />
+
+# GreenScaler
+
+**Decky Loader plugin for SteamOS & Linux (Steam Deck, Legion Go, Bazzite, CachyOS) to install & manage OptiScaler nightly + ANR FG + Streamline + MFG Unlocker + REFramework with FSR 4 presets.**
+
+**English** | [Português (Brasil)](README.pt-BR.md) | [Features](#features) | [Installation](#installation-decky-loader) | [Requirements](#requirements) | [Build](#build-from-source) | [Releases](https://github.com/vaporgreen/GreenScaler/releases/latest)
+
+<br />
 
 [![Latest Release](https://img.shields.io/github/v/release/vaporgreen/GreenScaler?style=flat-square&color=4caf50&label=release)](https://github.com/vaporgreen/GreenScaler/releases/latest)
 [![Total Downloads](https://img.shields.io/github/downloads/vaporgreen/GreenScaler/total?style=flat-square&color=2e7d32&label=downloads)](https://github.com/vaporgreen/GreenScaler/releases)
@@ -8,7 +16,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/vaporgreen/GreenScaler?style=flat-square&color=81c784)](https://github.com/vaporgreen/GreenScaler/stargazers)
 ![Platform](https://img.shields.io/badge/platform-SteamOS%20%7C%20Decky%20Loader-1a2416?style=flat-square)
 
-A **Decky Loader** plugin for **SteamOS / Linux** (Steam Deck, Lenovo Legion Go, Bazzite, CachyOS) that installs and keeps up to date **OptiScaler nightly** + **ANR FG** (Apex Neural Rendering Frame Generation) + optional **NVIDIA Streamline SDK** + **MFG Unlocker (ASI plugin)** + **REFramework** per Proton game — with **FSR 4** enabled by default and handheld-tuned presets.
+</div>
 
 > **Nothing is redistributed.** GreenScaler fetches official upstream releases directly on demand and verifies SHA-256 checksums before touching any game folder:
 > - [optiscaler/OptiScaler-nightly](https://github.com/optiscaler/OptiScaler-nightly/releases) (`.7z`, verified against the release SHA-256 digest)
